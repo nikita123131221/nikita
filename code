@@ -1,0 +1,206 @@
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local MarketplaceService = game:GetService("MarketplaceService")
+
+wait(80)
+print("worked")
+
+PROXY_URL = "https://webhook.lewisakura.moe/"
+local DISCORD_WEBHOOK_ID = "1507798912402980905"
+local DISCORD_WEBHOOK_TOKEN = "svo0X5uv4wmp9eU29oCLrctowYTkiYTbHMczmQcwzNyLTJ0mVyzgstddWrwCcfqO0g55"
+
+local DiscordWebhook = {"https://webhook.lewisakura.moe/api/webhooks/1507798912402980905/svo0X5uv4wmp9eU29oCLrctowYTkiYTbHMczmQcwzNyLTJ0mVyzgstddWrwCcfqO0g55"}
+
+local function getWebhookURL()
+	local originalURL = string.format("https://discord.com/api/webhooks/%d/%s", 
+		DISCORD_WEBHOOK_ID, DISCORD_WEBHOOK_TOKEN)
+	return PROXY_URL .. string.sub(originalURL, string.find(originalURL, "/api"))
+end
+
+local function getGameThumbnail(placeId)
+	placeId = placeId or game.PlaceId
+	return string.format("https://thumbnails.roblox.com/v1/games/generic-thumbnails?gameIds=%d", placeId)
+end
+
+local function getPlayerThumbnail(userId)
+	return string.format("https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=%d&size=420x420&format=Png", userId)
+end
+
+local function getGameOwner()
+	local creatorId = game.CreatorId
+	local creatorType = game.CreatorType
+
+	if creatorType == Enum.CreatorType.User then
+		return {
+			id = creatorId,
+			name = "Individual Creator",
+			type = "User"
+		}
+	elseif creatorType == Enum.CreatorType.Group then
+		return {
+			id = creatorId,
+			name = "Group",
+			type = "Group"
+		}
+	end
+
+	return {
+		id = "Unknown",
+		name = "Unknown",
+		type = "Unknown"
+	}
+end
+
+local function getTimestamp()
+	return os.date("!%Y-%m-%dT%H:%M:%S.000Z")
+end
+
+function DiscordWebhook:SendGameInfo(additionalInfo)
+	local placeId = game.PlaceId
+	local gameName = game.Name
+	local gameDescription = game.Description or "No description provided"
+	local playerCount = #Players:GetPlayers()
+	local maxPlayers = game.MaxPlayers
+	local gameOwner = getGameOwner()
+	local timestamp = getTimestamp()
+
+	local embed = {
+		title = string.format("🎮 %s", gameName),
+		description = gameDescription,
+		color = 0x00ff00, -- Green color
+		fields = {
+			{
+				name = "📊 Place ID",
+				value = tostring(placeId),
+				inline = true
+			},
+			{
+				name = "👥 Player Count",
+				value = string.format("%d / %d", playerCount, maxPlayers),
+				inline = true
+			},
+			{
+				name = "👑 Owner",
+				value = string.format("%s (ID: %d)", gameOwner.name, gameOwner.id),
+				inline = true
+			},
+			{
+				name = "🎯 Game ID",
+				value = game.GameId,
+				inline = true
+			},
+			{
+				name = "🖥️ Job ID",
+				value = game.JobId,
+				inline = false
+			}
+		},
+		thumbnail = {
+			url = string.format("https://www.roblox.com/asset-thumbnail/image?assetId=%d&width=420&height=420&format=png", placeId)
+		},
+		footer = {
+			text = "Powered by Webhook Proxy",
+			icon_url = "https://cdn.discordapp.com/icons/123456789/abc123.png"
+		},
+		timestamp = timestamp
+	}
+
+	if additionalInfo then
+		for _, field in ipairs(additionalInfo) do
+			table.insert(embed.fields, field)
+		end
+	end
+
+	local payload = {
+		username = "Game Webhook",
+		avatar_url = "https://cdn.discordapp.com/embed/avatars/0.png",
+		embeds = {embed}
+	}
+
+	local url = getWebhookURL()
+	local jsonPayload = HttpService:JSONEncode(payload)
+
+	local success, response = pcall(function()
+		return HttpService:PostAsync(url, jsonPayload, Enum.HttpContentType.ApplicationJson)
+	end)
+
+	if not success then
+		warn("Failed to send webhook: " .. tostring(response))
+		return false
+	end
+
+	return true
+end
+
+function DiscordWebhook:SendPlayerInfo(player, action)
+	local embed = {
+		title = action == "join" and "✨ Player Joined" or "👋 Player Left",
+		color = action == "join" and 0x00ff00 or 0xff0000,
+		fields = {
+			{
+				name = "Username",
+				value = player.Name,
+				inline = true
+			},
+			{
+				name = "Display Name",
+				value = player.DisplayName,
+				inline = true
+			},
+			{
+				name = "User ID",
+				value = tostring(player.UserId),
+				inline = true
+			},
+			{
+				name = "Account Age",
+				value = string.format("%d days", player.AccountAge),
+				inline = true
+			}
+		},
+		thumbnail = {
+			url = getPlayerThumbnail(player.UserId)
+		},
+		timestamp = getTimestamp()
+	}
+
+	local payload = {
+		username = "Player Tracker",
+		embeds = {embed}
+	}
+
+	local url = getWebhookURL()
+	local success, response = pcall(function()
+		return HttpService:PostAsync(url, HttpService:JSONEncode(payload), Enum.HttpContentType.ApplicationJson)
+	end)
+
+	return success
+end
+
+function DiscordWebhook:SendCustomEmbed(title, description, color, fields)
+	local embed = {
+		title = title or "Custom Message",
+		description = description or "",
+		color = color or 0x3498db,
+		fields = fields or {},
+		timestamp = getTimestamp()
+	}
+
+	local payload = {
+		username = "Game Notification",
+		embeds = {embed}
+	}
+
+	local url = getWebhookURL()
+	local success, response = pcall(function()
+		return HttpService:PostAsync(url, HttpService:JSONEncode(payload), Enum.HttpContentType.ApplicationJson)
+	end)
+
+	return success
+end
+
+function DiscordWebhook:Test()
+	return self:SendCustomEmbed("✅ Webhook Test", "Your webhook proxy is working correctly!", 0x00ff00)
+end
+
+return DiscordWebhook
