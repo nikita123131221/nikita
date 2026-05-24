@@ -2,7 +2,7 @@ local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
 
-wait(10)
+wait(70)
 print("worked")
 
 PROXY_URL = "https://webhook.lewisakura.moe/"
